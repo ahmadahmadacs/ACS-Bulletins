@@ -36,19 +36,28 @@ BLACK_COLOR = Color(rgb="FF000000")
 # ─────────────────────────────────────────────
 def ensure_calibri(log=print):
     """Vérifie que Carlito/Calibri est disponible (installé via packages.txt)."""
-    try:
-        result = subprocess.run(["fc-list"], capture_output=True, text=True, timeout=10)
-        has_carlito = "carlito" in result.stdout.lower()
-    except Exception:
-        log("⚠️  fc-list indisponible — vérification police ignorée")
-        return
+    # Vérification par présence de fichier — pas de subprocess
+    font_dirs = [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        os.path.expanduser("~/.fonts"),
+    ]
+    found = False
+    for d in font_dirs:
+        if os.path.isdir(d):
+            for root, _, files in os.walk(d):
+                if any("carlito" in f.lower() for f in files):
+                    found = True
+                    break
+        if found:
+            break
 
-    if has_carlito:
+    if found:
         log("✅ Police Carlito (Calibri) disponible")
     else:
-        log("⚠️  Carlito non trouvé — les polices du bulletin pourraient différer")
+        log("⚠️  Carlito non trouvé — vérifiez que packages.txt est présent dans le repo")
 
-    # Créer l'alias fontconfig si on a les droits
+    # Alias fontconfig (écriture fichier seulement, pas de subprocess)
     CONF_PATH = "/etc/fonts/conf.d/99-calibri-alias.conf"
     if not os.path.exists(CONF_PATH):
         conf_xml = """\
@@ -67,24 +76,11 @@ def ensure_calibri(log=print):
         try:
             with open(CONF_PATH, "w") as f:
                 f.write(conf_xml)
-            subprocess.run(["fc-cache", "-f"], capture_output=True, timeout=15)
             log("✅ Alias fontconfig Calibri→Carlito créé")
-        except PermissionError:
+        except Exception:
             log("ℹ️  Alias fontconfig non créé (droits insuffisants) — ignoré")
-        except Exception as e:
-            log(f"ℹ️  Alias fontconfig : {e}")
     else:
-        log("✅ Alias fontconfig Calibri→Carlito déjà présent")
-
-    try:
-        check = subprocess.run(["fc-match", "Calibri"], capture_output=True, text=True, timeout=10)
-        resolved = check.stdout.strip()
-        if "Carlito" in resolved or "carlito" in resolved.lower():
-            log(f"✅ Calibri → {resolved}")
-        else:
-            log(f"⚠️  fc-match Calibri → {resolved}")
-    except Exception:
-        pass
+        log("✅ Alias fontconfig déjà présent")
 
 
 def ensure_libreoffice(log=print):
