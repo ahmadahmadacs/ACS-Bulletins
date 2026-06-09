@@ -99,12 +99,12 @@ def copy_color(color_obj):
     return copy.copy(color_obj)
 
 def is_white_cell(row_idx, col_idx):
+    # G5, G6 retirés (v8) — pas de fond propre → texte NOIR
     WHITE_CELLS = {
-        (5, 5), (5, 7),
-        (6, 5), (6, 7),
-        (9, 8),
-        (14, 8),
-        (19, 8),
+        (5, 5), (6, 5),    # E5, E6
+        (9, 8),            # H9
+        (14, 8),           # H14
+        (19, 8),           # H19
     }
     for r in (20, 21, 22):
         for c in range(1, 9):
@@ -210,12 +210,12 @@ def fix_bulletin_formatting(wb):
                 horizontal=old_a.horizontal, vertical="center",
                 wrap_text=True, shrink_to_fit=True)
 
-    # G5, G6 blanc
+    # G5, G6 : pas de fond propre → texte NOIR (v8 fix)
     for row_idx in (5, 6):
         cell = ws.cell(row=row_idx, column=7)
         if cell.value is not None:
             cell.font = Font(name="Calibri", size=12,
-                             bold=cell.font.bold, color=WHITE_COLOR)
+                             bold=cell.font.bold, color=BLACK_COLOR)
             cell.alignment = Alignment(
                 horizontal="center", vertical="center", shrink_to_fit=True)
 
