@@ -159,7 +159,7 @@ with col_sys:
                 unsafe_allow_html=True)
 with col_info:
     if st.session_state.sys_ready:
-        st.markdown('<span class="badge-ok">✅ Prêt</span>', unsafe_allow_width=True)
+        st.markdown('<span class="badge-ok">✅ Prêt</span>', unsafe_allow_html=True)
 
 if not st.session_state.sys_ready:
     if st.button("🔧 Vérifier LibreOffice + Calibri", use_container_width=True):
