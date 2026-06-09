@@ -162,9 +162,9 @@ with col_info:
         st.markdown('<span class="badge-ok">✅ Prêt</span>', unsafe_allow_width=True)
 
 if not st.session_state.sys_ready:
-    if st.button("🔧 Initialiser LibreOffice + Calibri", use_container_width=True):
+    if st.button("🔧 Vérifier LibreOffice + Calibri", use_container_width=True):
         logs = []
-        with st.spinner("Installation en cours (peut prendre 1-2 min la première fois)..."):
+        with st.spinner("Vérification du système..."):
             ensure_libreoffice(log=logs.append)
             ensure_calibri(log=logs.append)
         st.session_state.sys_ready = True

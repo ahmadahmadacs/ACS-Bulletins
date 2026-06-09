@@ -35,16 +35,20 @@ BLACK_COLOR = Color(rgb="FF000000")
 # 🖋️  ENSURE CALIBRI
 # ─────────────────────────────────────────────
 def ensure_calibri(log=print):
-    """Install Carlito + fontconfig alias so LibreOffice resolves Calibri correctly."""
-    result = subprocess.run(["fc-list"], capture_output=True, text=True)
-    if "carlito" not in result.stdout.lower():
-        log("📦 Installation Carlito (clone Calibri)...")
-        subprocess.run(
-            ["apt-get", "install", "-y", "fonts-crosextra-carlito"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        log("✅ Carlito installé")
+    """Vérifie que Carlito/Calibri est disponible (installé via packages.txt)."""
+    try:
+        result = subprocess.run(["fc-list"], capture_output=True, text=True, timeout=10)
+        has_carlito = "carlito" in result.stdout.lower()
+    except Exception:
+        log("⚠️  fc-list indisponible — vérification police ignorée")
+        return
 
+    if has_carlito:
+        log("✅ Police Carlito (Calibri) disponible")
+    else:
+        log("⚠️  Carlito non trouvé — les polices du bulletin pourraient différer")
+
+    # Créer l'alias fontconfig si on a les droits
     CONF_PATH = "/etc/fonts/conf.d/99-calibri-alias.conf"
     if not os.path.exists(CONF_PATH):
         conf_xml = """\
@@ -60,30 +64,35 @@ def ensure_calibri(log=print):
     <prefer><family>Carlito</family></prefer>
   </alias>
 </fontconfig>"""
-        with open(CONF_PATH, "w") as f:
-            f.write(conf_xml)
-        subprocess.run(["fc-cache", "-f"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        log("✅ Alias fontconfig Calibri→Carlito créé")
-
-    check = subprocess.run(["fc-match", "Calibri"], capture_output=True, text=True)
-    resolved = check.stdout.strip()
-    if "Carlito" in resolved or "carlito" in resolved.lower():
-        log(f"✅ Calibri → {resolved}")
+        try:
+            with open(CONF_PATH, "w") as f:
+                f.write(conf_xml)
+            subprocess.run(["fc-cache", "-f"], capture_output=True, timeout=15)
+            log("✅ Alias fontconfig Calibri→Carlito créé")
+        except PermissionError:
+            log("ℹ️  Alias fontconfig non créé (droits insuffisants) — ignoré")
+        except Exception as e:
+            log(f"ℹ️  Alias fontconfig : {e}")
     else:
-        log(f"⚠️  fc-match Calibri → {resolved}")
+        log("✅ Alias fontconfig Calibri→Carlito déjà présent")
+
+    try:
+        check = subprocess.run(["fc-match", "Calibri"], capture_output=True, text=True, timeout=10)
+        resolved = check.stdout.strip()
+        if "Carlito" in resolved or "carlito" in resolved.lower():
+            log(f"✅ Calibri → {resolved}")
+        else:
+            log(f"⚠️  fc-match Calibri → {resolved}")
+    except Exception:
+        pass
 
 
 def ensure_libreoffice(log=print):
-    if not shutil.which("libreoffice"):
-        log("📦 Installation LibreOffice (première fois, ~2 min)...")
-        subprocess.run(
-            ["apt-get", "install", "-y", "libreoffice"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        log("✅ LibreOffice installé")
-    else:
+    """Vérifie que LibreOffice est disponible (installé via packages.txt)."""
+    if shutil.which("libreoffice"):
         log("✅ LibreOffice disponible")
+    else:
+        log("❌ LibreOffice introuvable — assurez-vous que packages.txt contient 'libreoffice'")
 
 # ─────────────────────────────────────────────
 # 🎨 COLOR HELPERS
