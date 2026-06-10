@@ -346,9 +346,11 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
     # S1 → vide, S2 → (C+D)/2, S3 → (C+D+E)/3  — note vide = 0
     nb_sems = len(sems_actifs)
     MATIERE_ROWS_NORMAL = list(range(9, 20))  # lignes 9 à 19 (depuis etudiant)
+    b_values = {}  # stocke les moyennes B9:B19 pour calculer B20 ensuite
     for row_idx in MATIERE_ROWS_NORMAL:
         if semestre_cible == "S1":
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None
+            b_values[row_idx] = 0.0
         else:
             total = 0.0
             for sem in sems_actifs:
@@ -360,15 +362,14 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
                     total += float(v) if v is not None else 0.0
             moyenne = round(total / nb_sems, 2)
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
+            b_values[row_idx] = moyenne
 
     # ── Feuille Bulletin : B20 = somme de B9:B19 ──
+    # On utilise b_values déjà calculées, pas ws_bul.cell (qui peut contenir des formules)
     if semestre_cible == "S1":
         ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = None
     else:
-        total_b20 = 0.0
-        for r in range(9, 20):
-            v = ws_bul.cell(row=r, column=BULLETIN_AVG_COL).value
-            total_b20 += float(v) if v is not None else 0.0
+        total_b20 = sum(b_values.values())
         ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = round(total_b20, 2)
 
     # B21 : laissé tel quel (formule du template)
