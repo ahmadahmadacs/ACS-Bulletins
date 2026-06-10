@@ -150,6 +150,7 @@ if "xlsx_zip"   not in st.session_state: st.session_state.xlsx_zip = None
 if "pdf_count"  not in st.session_state: st.session_state.pdf_count = 0
 if "errors"     not in st.session_state: st.session_state.errors = []
 if "sys_ready"  not in st.session_state: st.session_state.sys_ready = False
+if "semestre"   not in st.session_state: st.session_state.semestre = "S3" 
 
 # ─────────────────────────────────────────────
 # STEP 1 — Système (LibreOffice + Calibri)
@@ -250,6 +251,37 @@ else:
 st.markdown("---")
 
 # ─────────────────────────────────────────────
+# STEP 4b — Semestre cible
+# ─────────────────────────────────────────────
+st.markdown('<div class="step-title">📅 Étape 3b — Semestre à générer</div>',
+            unsafe_allow_html=True)
+
+col_s1, col_s2, col_s3 = st.columns(3)
+sem_choice = st.session_state.semestre
+with col_s1:
+    if st.button("📘 S1 — Semestre 1 seulement", use_container_width=True,
+                 type="primary" if sem_choice == "S1" else "secondary"):
+        st.session_state.semestre = "S1"
+        st.rerun()
+    st.caption("Notes S1 uniquement · Pas de moyenne")
+with col_s2:
+    if st.button("📗 S2 — Semestres 1 + 2", use_container_width=True,
+                 type="primary" if sem_choice == "S2" else "secondary"):
+        st.session_state.semestre = "S2"
+        st.rerun()
+    st.caption("Notes S1 + S2 · Moyenne S1+S2")
+with col_s3:
+    if st.button("📕 S3 — Semestres 1 + 2 + 3", use_container_width=True,
+                 type="primary" if sem_choice == "S3" else "secondary"):
+        st.session_state.semestre = "S3"
+        st.rerun()
+    st.caption("Notes S1 + S2 + S3 · Moyenne finale")
+
+st.info(f"✅ Semestre sélectionné : **{st.session_state.semestre}**")
+
+st.markdown("---")
+
+# ─────────────────────────────────────────────
 # STEP 5 — GENERATE
 # ─────────────────────────────────────────────
 st.markdown('<div class="step-title">🚀 Étape 4 — Génération</div>',
@@ -313,7 +345,7 @@ if generate_btn and ready:
 
         output_dir = tmpdir / "output"
 
-        log(f"🚀 Démarrage — {len(selected_groups)} groupe(s) sélectionné(s)")
+        log(f"🚀 Démarrage — {len(selected_groups)} groupe(s) · Semestre cible : {st.session_state.semestre}")
 
         pdf_list, xlsx_list, error_list = generate_all(
             notes_path=notes_path,
@@ -321,6 +353,7 @@ if generate_btn and ready:
             output_dir=output_dir,
             log=log,
             progress_cb=progress_cb,
+            semestre_cible=st.session_state.semestre,
         )
 
         if pdf_list:

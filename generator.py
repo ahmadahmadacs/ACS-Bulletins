@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from datetime import date
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.colors import Color
@@ -286,7 +287,14 @@ def fix_etudiant_formatting(wb):
 # ─────────────────────────────────────────────
 # FILL + EXPORT
 # ─────────────────────────────────────────────
-def fill_template(template_path, out_path, nom, data, group):
+# Semestres à remplir selon le semestre cible
+SEMS_TO_FILL = {
+    "S1": ["S1"],
+    "S2": ["S1", "S2"],
+    "S3": ["S1", "S2", "S3"],
+}
+
+def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"):
     shutil.copy(template_path, out_path)
     wb      = load_workbook(out_path)
     ws      = wb["etudiant"]
@@ -295,8 +303,14 @@ def fill_template(template_path, out_path, nom, data, group):
 
     ws["B5"].value = nom
     ws["B4"].value = data["classe"]
+    ws["C6"].value = date.today()  # date d'émission automatique
 
+    sems_actifs = SEMS_TO_FILL.get(semestre_cible, ["S1", "S2", "S3"])
+
+    # Remplir uniquement les semestres autorisés
     for sem, row_idx in SEM_ROW.items():
+        if sem not in sems_actifs:
+            continue  # laisser vide
         if sem not in data["sems"]:
             continue
         notes = data["sems"][sem]
@@ -305,16 +319,19 @@ def fill_template(template_path, out_path, nom, data, group):
                 ws.cell(row=row_idx, column=col).value = (
                     notes[i] if notes[i] is not None else None)
 
-    avg_notes = None
-    for s in ["S3", "S2", "S1"]:
-        if s in data["avgs"]:
-            avg_notes = data["avgs"][s]
-            break
-
-    if avg_notes:
-        for i, col in enumerate(cols):
-            if i < len(avg_notes) and avg_notes[i] is not None:
-                ws.cell(row=7, column=col).value = avg_notes[i]
+    # Moyenne : seulement si semestre_cible >= S2
+    if semestre_cible in ("S2", "S3"):
+        avg_notes = None
+        # Prendre la moyenne du semestre le plus récent actif
+        for s in reversed(sems_actifs):
+            if s in data["avgs"]:
+                avg_notes = data["avgs"][s]
+                break
+        if avg_notes:
+            for i, col in enumerate(cols):
+                if i < len(avg_notes) and avg_notes[i] is not None:
+                    ws.cell(row=7, column=col).value = avg_notes[i]
+    # Si S1 : row 7 (moyenne) reste vide
 
     fix_bulletin_formatting(wb)
     fix_etudiant_formatting(wb)
@@ -346,7 +363,7 @@ def export_pdf(xlsx_path, pdf_path):
 # MAIN GENERATION FUNCTION
 # ─────────────────────────────────────────────
 def generate_all(notes_path, templates: dict, output_dir: Path,
-                 log=print, progress_cb=None):
+                 log=print, progress_cb=None, semestre_cible="S3"):
     """
     notes_path   : path to the notes Excel file
     templates    : dict {group: path_to_template_xlsx}
@@ -384,7 +401,7 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
         pdf  = output_dir / f"{prefix}_{safe_nom}.pdf"
 
         try:
-            fill_template(tmpl_path, xlsx, nom, data, group)
+            fill_template(tmpl_path, xlsx, nom, data, group, semestre_cible=semestre_cible)
             # Copier le xlsx avant conversion (LibreOffice peut modifier le fichier)
             xlsx_out = xlsx_dir / xlsx.name
             shutil.copy2(str(xlsx), str(xlsx_out))
