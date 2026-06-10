@@ -341,29 +341,37 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
     # ── Feuille Bulletin : date d'émission en C6 ──
     ws_bul["C6"].value = date.today().strftime("%d-%m-%Y")
 
-    # ── Feuille Bulletin : moyenne par matière en col B (lignes 9-20) ──
-    # S1 → 0, S2 → (S1+S2)/2, S3 → (S1+S2+S3)/3
-    # Note vide = 0
+    # ── Feuille Bulletin : moyenne par matière en col B (lignes 9-19) ──
+    # Calculée depuis etudiant (colonnes C/D/E = S1/S2/S3)
+    # S1 → vide, S2 → (C+D)/2, S3 → (C+D+E)/3  — note vide = 0
     nb_sems = len(sems_actifs)
-    for row_idx in BULLETIN_MATIERE_ROWS:
+    MATIERE_ROWS_NORMAL = list(range(9, 20))  # lignes 9 à 19 (depuis etudiant)
+    for row_idx in MATIERE_ROWS_NORMAL:
         if semestre_cible == "S1":
-            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None  # vide pour S1
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None
         else:
             total = 0.0
             for sem in sems_actifs:
-                col = BULLETIN_COL[sem]
-                cell_val = ws_bul.cell(row=row_idx, column=col).value
-                # La cellule Bulletin est alimentée par formule depuis etudiant
-                # On calcule depuis etudiant directement pour fiabilité
                 sem_row = SEM_ROW[sem]
-                # Trouver l'index matière : row_idx 9→0, 10→1, ...
                 mat_idx = row_idx - 9
                 et_col  = cols[mat_idx] if mat_idx < len(cols) else None
                 if et_col is not None:
                     v = ws_et.cell(row=sem_row, column=et_col).value
                     total += float(v) if v is not None else 0.0
-                else:
-                    total += 0.0
+            moyenne = round(total / nb_sems, 2)
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
+
+    # ── Feuille Bulletin : B20 et B21 calculées depuis C/D/E de la même feuille ──
+    # S1 → vide, S2 → (C+D)/2, S3 → (C+D+E)/3  — valeur vide = 0
+    for row_idx in (20, 21):
+        if semestre_cible == "S1":
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None
+        else:
+            total = 0.0
+            for sem in sems_actifs:
+                col = BULLETIN_COL[sem]
+                v = ws_bul.cell(row=row_idx, column=col).value
+                total += float(v) if v is not None else 0.0
             moyenne = round(total / nb_sems, 2)
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
 
