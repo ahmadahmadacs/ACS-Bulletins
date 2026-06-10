@@ -128,6 +128,8 @@ def load_group_semester(file_path, group, sem):
     pending     = []
     header_done = False
 
+    current_class = ""
+
     for row in ws.iter_rows(values_only=True):
         if not row or row[0] is None:
             continue
@@ -150,15 +152,23 @@ def load_group_semester(file_path, group, sem):
             for i in range(nb_cols):
                 v = row[2 + i] if (2 + i) < len(row) else None
                 avg.append(round(v, 2) if isinstance(v, float) else v)
+
+            # Lire le nom de classe en colonne B si c'est معدل الصف
+            if "الصف" in val0:
+                class_name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                if class_name:
+                    current_class = class_name
+                    for nom in pending:
+                        result[nom]["classe"] = current_class
+
             for nom in pending:
                 result[nom]["class_avg"] = avg
             pending = []
             continue
 
-        nom    = row[0]
-        classe = row[1] if len(row) > 1 else ""
-        notes  = [row[2 + i] if (2 + i) < len(row) else None for i in range(nb_cols)]
-        result[nom] = {"classe": classe, "notes": notes, "class_avg": None}
+        nom   = row[0]
+        notes = [row[2 + i] if (2 + i) < len(row) else None for i in range(nb_cols)]
+        result[nom] = {"classe": current_class, "notes": notes, "class_avg": None}
         pending.append(nom)
 
     wb.close()
@@ -344,16 +354,18 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
     log(f"📋 {total} bulletins à générer")
 
     for idx, (group, nom, data, tmpl_path) in enumerate(all_students):
-        safe = nom.replace(" ", "_")
-        xlsx = tmp_dir    / f"{group}_{safe}.xlsx"
-        pdf  = output_dir / f"{group}_{safe}.pdf"
+        safe_nom    = nom.replace(" ", "_")
+        safe_classe = str(data.get("classe", "")).replace(" ", "_").replace("/", "-")
+        prefix      = safe_classe if safe_classe else group
+        xlsx = tmp_dir    / f"{prefix}_{safe_nom}.xlsx"
+        pdf  = output_dir / f"{prefix}_{safe_nom}.pdf"
 
         try:
             fill_template(tmpl_path, xlsx, nom, data, group)
             ok = export_pdf(str(xlsx), str(pdf))
             if ok:
                 pdf_list.append(pdf)
-                log(f"  ✔ [{idx+1}/{total}] {nom}")
+                log(f"  ✔ [{idx+1}/{total}] {prefix} — {nom}")
             else:
                 error_list.append(f"{nom}: PDF non généré par LibreOffice")
                 log(f"  ⚠ [{idx+1}/{total}] {nom} — PDF manquant")
