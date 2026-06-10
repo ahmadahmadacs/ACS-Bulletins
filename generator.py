@@ -374,6 +374,9 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
 
     # B21 : laissé tel quel (formule du template)
 
+    # ── Étendre la zone d'impression jusqu'à la ligne 44 ──
+    ws_bul.print_area = "A1:H44"
+
     fix_bulletin_formatting(wb)
     fix_etudiant_formatting(wb)
     wb.save(out_path)
