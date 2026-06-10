@@ -294,39 +294,40 @@ SEMS_TO_FILL = {
     "S3": ["S1", "S2", "S3"],
 }
 
+# Lignes des matières dans la feuille Bulletin (col B = moyenne, C = S1, D = S2, E = S3)
+BULLETIN_MATIERE_ROWS = list(range(9, 21))  # lignes 9 à 20
+BULLETIN_COL = {"S1": 3, "S2": 4, "S3": 5}  # C=3, D=4, E=5
+BULLETIN_AVG_COL = 2  # col B
+
 def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"):
     shutil.copy(template_path, out_path)
     wb      = load_workbook(out_path)
-    ws      = wb["etudiant"]
+    ws_et   = wb["etudiant"]
+    ws_bul  = wb["Bulletin"]
     nb_cols = GROUPS[group]["nb_cols"]
     cols    = list(range(3, 3 + nb_cols))
 
-    ws["B5"].value = nom
-    ws["B4"].value = data["classe"]
-    # Date d'émission : écrire en string pour éviter que le format du template l'écrase
-    ws["C6"].value = date.today().strftime("%d-%m-%Y")
+    ws_et["B5"].value = nom
+    ws_et["B4"].value = data["classe"]
 
     sems_actifs = SEMS_TO_FILL.get(semestre_cible, ["S1", "S2", "S3"])
 
-    # Remplir uniquement les semestres autorisés
+    # ── Feuille etudiant : remplir les notes des semestres actifs ──
     for sem, row_idx in SEM_ROW.items():
         if sem not in sems_actifs:
-            continue  # laisser vide
+            continue
         if sem not in data["sems"]:
             continue
         notes = data["sems"][sem]
         for i, col in enumerate(cols):
             if i < len(notes):
-                ws.cell(row=row_idx, column=col).value = (
+                ws_et.cell(row=row_idx, column=col).value = (
                     notes[i] if notes[i] is not None else None)
 
-    # Moyenne : seulement pour S2 et S3, et uniquement depuis data["avgs"]
-    # (moyenne lue depuis le fichier notes, ligne معدل الصف)
-    # Pour S1 : row 7 reste vide
+    # ── Feuille etudiant : moyenne de classe (row 7, lue depuis le fichier notes) ──
     if semestre_cible in ("S2", "S3"):
-        avg_notes = data["avgs"].get(semestre_cible)  # moyenne du semestre cible exact
+        avg_notes = data["avgs"].get(semestre_cible)
         if avg_notes is None:
-            # fallback : prendre le semestre actif le plus récent disponible
             for s in reversed(sems_actifs):
                 if s in data["avgs"]:
                     avg_notes = data["avgs"][s]
@@ -334,7 +335,36 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
         if avg_notes:
             for i, col in enumerate(cols):
                 if i < len(avg_notes) and avg_notes[i] is not None:
-                    ws.cell(row=7, column=col).value = avg_notes[i]
+                    ws_et.cell(row=7, column=col).value = avg_notes[i]
+
+    # ── Feuille Bulletin : date d'émission en C6 ──
+    ws_bul["C6"].value = date.today().strftime("%d-%m-%Y")
+
+    # ── Feuille Bulletin : moyenne par matière en col B (lignes 9-20) ──
+    # S1 → 0, S2 → (S1+S2)/2, S3 → (S1+S2+S3)/3
+    # Note vide = 0
+    nb_sems = len(sems_actifs)
+    for row_idx in BULLETIN_MATIERE_ROWS:
+        if semestre_cible == "S1":
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = 0
+        else:
+            total = 0.0
+            for sem in sems_actifs:
+                col = BULLETIN_COL[sem]
+                cell_val = ws_bul.cell(row=row_idx, column=col).value
+                # La cellule Bulletin est alimentée par formule depuis etudiant
+                # On calcule depuis etudiant directement pour fiabilité
+                sem_row = SEM_ROW[sem]
+                # Trouver l'index matière : row_idx 9→0, 10→1, ...
+                mat_idx = row_idx - 9
+                et_col  = cols[mat_idx] if mat_idx < len(cols) else None
+                if et_col is not None:
+                    v = ws_et.cell(row=sem_row, column=et_col).value
+                    total += float(v) if v is not None else 0.0
+                else:
+                    total += 0.0
+            moyenne = round(total / nb_sems, 2)
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
 
     fix_bulletin_formatting(wb)
     fix_etudiant_formatting(wb)
