@@ -152,9 +152,22 @@ def load_group_semester(file_path, group, sem):
                 v = row[2 + i] if (2 + i) < len(row) else None
                 avg.append(round(v, 2) if isinstance(v, float) else v)
 
-            # Lire le nom de classe en colonne B si c'est معدل الصف
-            if "الصف" in val0:
-                cn = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+            # Lire le nom de classe en colonne B
+            # Détecte معدل الصف avec ou sans variantes d'encodage
+            is_classe_row = "الصف" in val0 or val0.strip().startswith("معدل")
+            if is_classe_row:
+                cn = ""
+                # Chercher dans col B (index 1) et col C (index 2) au cas où
+                for col_idx in (1, 2):
+                    raw = row[col_idx] if col_idx < len(row) else None
+                    if raw is not None and str(raw).strip():
+                        candidate = str(raw).strip()
+                        # Ignorer si c'est un nombre (c'est une note, pas un nom de classe)
+                        try:
+                            float(candidate)
+                        except ValueError:
+                            cn = candidate
+                            break
                 if cn:
                     current_class_fichier = cn
                     for nom in pending:
