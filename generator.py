@@ -361,19 +361,28 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
             moyenne = round(total / nb_sems, 2)
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
 
-    # ── Feuille Bulletin : B20 et B21 calculées depuis C/D/E de la même feuille ──
-    # S1 → vide, S2 → (C+D)/2, S3 → (C+D+E)/3  — valeur vide = 0
-    for row_idx in (20, 21):
-        if semestre_cible == "S1":
-            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None
-        else:
-            total = 0.0
-            for sem in sems_actifs:
-                col = BULLETIN_COL[sem]
-                v = ws_bul.cell(row=row_idx, column=col).value
-                total += float(v) if v is not None else 0.0
-            moyenne = round(total / nb_sems, 2)
-            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
+    # ── Feuille Bulletin : B20 = somme de B9:B19 ──
+    if semestre_cible == "S1":
+        ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = None
+    else:
+        total_b20 = 0.0
+        for r in range(9, 20):
+            v = ws_bul.cell(row=r, column=BULLETIN_AVG_COL).value
+            total_b20 += float(v) if v is not None else 0.0
+        ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = round(total_b20, 2)
+
+    # ── Feuille Bulletin : B21 = moyenne de la colonne N de etudiant ──
+    # S2 → (N8 + N9) / 2,  S3 → (N8 + N9 + N10) / 3
+    # N = colonne 14 dans etudiant
+    ET_COL_N = 14
+    if semestre_cible == "S1":
+        ws_bul.cell(row=21, column=BULLETIN_AVG_COL).value = None
+    else:
+        total_b21 = 0.0
+        for sem in sems_actifs:
+            v = ws_et.cell(row=SEM_ROW[sem], column=ET_COL_N).value
+            total_b21 += float(v) if v is not None else 0.0
+        ws_bul.cell(row=21, column=BULLETIN_AVG_COL).value = round(total_b21 / nb_sems, 2)
 
     fix_bulletin_formatting(wb)
     fix_etudiant_formatting(wb)
