@@ -303,7 +303,8 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
 
     ws["B5"].value = nom
     ws["B4"].value = data["classe"]
-    ws["C6"].value = date.today()  # date d'émission automatique
+    # Date d'émission : écrire en string pour éviter que le format du template l'écrase
+    ws["C6"].value = date.today().strftime("%d-%m-%Y")
 
     sems_actifs = SEMS_TO_FILL.get(semestre_cible, ["S1", "S2", "S3"])
 
@@ -319,19 +320,21 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
                 ws.cell(row=row_idx, column=col).value = (
                     notes[i] if notes[i] is not None else None)
 
-    # Moyenne : seulement si semestre_cible >= S2
+    # Moyenne : seulement pour S2 et S3, et uniquement depuis data["avgs"]
+    # (moyenne lue depuis le fichier notes, ligne معدل الصف)
+    # Pour S1 : row 7 reste vide
     if semestre_cible in ("S2", "S3"):
-        avg_notes = None
-        # Prendre la moyenne du semestre le plus récent actif
-        for s in reversed(sems_actifs):
-            if s in data["avgs"]:
-                avg_notes = data["avgs"][s]
-                break
+        avg_notes = data["avgs"].get(semestre_cible)  # moyenne du semestre cible exact
+        if avg_notes is None:
+            # fallback : prendre le semestre actif le plus récent disponible
+            for s in reversed(sems_actifs):
+                if s in data["avgs"]:
+                    avg_notes = data["avgs"][s]
+                    break
         if avg_notes:
             for i, col in enumerate(cols):
                 if i < len(avg_notes) and avg_notes[i] is not None:
                     ws.cell(row=7, column=col).value = avg_notes[i]
-    # Si S1 : row 7 (moyenne) reste vide
 
     fix_bulletin_formatting(wb)
     fix_etudiant_formatting(wb)

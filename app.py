@@ -150,7 +150,9 @@ if "xlsx_zip"   not in st.session_state: st.session_state.xlsx_zip = None
 if "pdf_count"  not in st.session_state: st.session_state.pdf_count = 0
 if "errors"     not in st.session_state: st.session_state.errors = []
 if "sys_ready"  not in st.session_state: st.session_state.sys_ready = False
-if "semestre"   not in st.session_state: st.session_state.semestre = "S3" 
+if "semestre"      not in st.session_state: st.session_state.semestre = "S3"
+if "pdf_zip_name"  not in st.session_state: st.session_state.pdf_zip_name = "bulletins_ACS_S3.zip"
+if "xlsx_zip_name" not in st.session_state: st.session_state.xlsx_zip_name = "bulletins_ACS_S3_excel.zip"
 
 # ─────────────────────────────────────────────
 # STEP 1 — Système (LibreOffice + Calibri)
@@ -356,19 +358,22 @@ if generate_btn and ready:
             semestre_cible=st.session_state.semestre,
         )
 
+        sem = st.session_state.semestre
         if pdf_list:
-            zip_path = tmpdir / "bulletins_ACS.zip"
+            zip_path = tmpdir / f"bulletins_ACS_{sem}.zip"
             zip_pdfs(pdf_list, zip_path)
-            st.session_state.pdf_zip   = zip_path.read_bytes()
-            st.session_state.pdf_count = len(pdf_list)
+            st.session_state.pdf_zip      = zip_path.read_bytes()
+            st.session_state.pdf_count    = len(pdf_list)
+            st.session_state.pdf_zip_name = f"bulletins_ACS_{sem}.zip"
             log(f"\n🎉 {len(pdf_list)} bulletins générés avec succès !")
         else:
             log("❌ Aucun bulletin généré.")
 
         if xlsx_list:
-            xlsx_zip_path = tmpdir / "bulletins_ACS_excel.zip"
+            xlsx_zip_path = tmpdir / f"bulletins_ACS_{sem}_excel.zip"
             zip_xlsx(xlsx_list, xlsx_zip_path)
-            st.session_state.xlsx_zip = xlsx_zip_path.read_bytes()
+            st.session_state.xlsx_zip      = xlsx_zip_path.read_bytes()
+            st.session_state.xlsx_zip_name = f"bulletins_ACS_{sem}_excel.zip"
 
         st.session_state.errors = error_list
         st.session_state.logs   = logs
@@ -392,7 +397,7 @@ if st.session_state.pdf_zip:
         st.download_button(
             label=f"⬇️  Télécharger les {st.session_state.pdf_count} bulletins PDF (ZIP)",
             data=st.session_state.pdf_zip,
-            file_name="bulletins_ACS.zip",
+            file_name=st.session_state.pdf_zip_name,
             mime="application/zip",
             use_container_width=True,
         )
@@ -401,7 +406,7 @@ if st.session_state.pdf_zip:
             st.download_button(
                 label=f"📊  Télécharger les {st.session_state.pdf_count} bulletins Excel (ZIP)",
                 data=st.session_state.xlsx_zip,
-                file_name="bulletins_ACS_excel.zip",
+                file_name=st.session_state.xlsx_zip_name,
                 mime="application/zip",
                 use_container_width=True,
             )
