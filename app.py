@@ -12,7 +12,7 @@ from pathlib import Path
 import streamlit as st
 from generator import (
     ensure_libreoffice, ensure_calibri,
-    generate_all, zip_pdfs, GROUPS
+    generate_all, zip_pdfs, zip_xlsx, GROUPS
 )
 
 # ─────────────────────────────────────────────
@@ -146,6 +146,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 if "logs"       not in st.session_state: st.session_state.logs = []
 if "pdf_zip"    not in st.session_state: st.session_state.pdf_zip = None
+if "xlsx_zip"   not in st.session_state: st.session_state.xlsx_zip = None
 if "pdf_count"  not in st.session_state: st.session_state.pdf_count = 0
 if "errors"     not in st.session_state: st.session_state.errors = []
 if "sys_ready"  not in st.session_state: st.session_state.sys_ready = False
@@ -314,7 +315,7 @@ if generate_btn and ready:
 
         log(f"🚀 Démarrage — {len(selected_groups)} groupe(s) sélectionné(s)")
 
-        pdf_list, error_list = generate_all(
+        pdf_list, xlsx_list, error_list = generate_all(
             notes_path=notes_path,
             templates=templates,
             output_dir=output_dir,
@@ -330,6 +331,11 @@ if generate_btn and ready:
             log(f"\n🎉 {len(pdf_list)} bulletins générés avec succès !")
         else:
             log("❌ Aucun bulletin généré.")
+
+        if xlsx_list:
+            xlsx_zip_path = tmpdir / "bulletins_ACS_excel.zip"
+            zip_xlsx(xlsx_list, xlsx_zip_path)
+            st.session_state.xlsx_zip = xlsx_zip_path.read_bytes()
 
         st.session_state.errors = error_list
         st.session_state.logs   = logs
@@ -348,15 +354,24 @@ if st.session_state.logs:
 
 if st.session_state.pdf_zip:
     st.markdown("---")
-    col_dl, col_stat = st.columns([2, 1])
+    col_dl, col_xlsx, col_stat = st.columns([2, 2, 1])
     with col_dl:
         st.download_button(
-            label=f"⬇️  Télécharger les {st.session_state.pdf_count} bulletins (ZIP)",
+            label=f"⬇️  Télécharger les {st.session_state.pdf_count} bulletins PDF (ZIP)",
             data=st.session_state.pdf_zip,
             file_name="bulletins_ACS.zip",
             mime="application/zip",
             use_container_width=True,
         )
+    with col_xlsx:
+        if st.session_state.xlsx_zip:
+            st.download_button(
+                label=f"📊  Télécharger les {st.session_state.pdf_count} bulletins Excel (ZIP)",
+                data=st.session_state.xlsx_zip,
+                file_name="bulletins_ACS_excel.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
     with col_stat:
         size_kb = len(st.session_state.pdf_zip) // 1024
         st.metric("Bulletins générés", st.session_state.pdf_count)

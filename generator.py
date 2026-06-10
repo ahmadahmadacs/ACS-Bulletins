@@ -356,10 +356,13 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
     Returns      : (pdf_list, error_list)
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    tmp_dir = output_dir / "tmp"
+    tmp_dir  = output_dir / "tmp"
+    xlsx_dir = output_dir / "xlsx"
     tmp_dir.mkdir(exist_ok=True)
+    xlsx_dir.mkdir(exist_ok=True)
 
     pdf_list   = []
+    xlsx_list  = []
     error_list = []
     all_students = []
 
@@ -382,6 +385,10 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
 
         try:
             fill_template(tmpl_path, xlsx, nom, data, group)
+            # Copier le xlsx avant conversion (LibreOffice peut modifier le fichier)
+            xlsx_out = xlsx_dir / xlsx.name
+            shutil.copy2(str(xlsx), str(xlsx_out))
+            xlsx_list.append(xlsx_out)
             ok = export_pdf(str(xlsx), str(pdf))
             if ok:
                 pdf_list.append(pdf)
@@ -397,11 +404,18 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
             progress_cb(idx + 1, total, nom)
 
     shutil.rmtree(tmp_dir, ignore_errors=True)
-    return pdf_list, error_list
+    return pdf_list, xlsx_list, error_list
 
 
 def zip_pdfs(pdf_list: list, zip_path: Path):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for pdf in pdf_list:
             zf.write(pdf, pdf.name)
+    return zip_path
+
+
+def zip_xlsx(xlsx_list: list, zip_path: Path):
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for xlsx in xlsx_list:
+            zf.write(xlsx, xlsx.name)
     return zip_path
