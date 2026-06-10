@@ -295,7 +295,7 @@ SEMS_TO_FILL = {
 }
 
 # Lignes des matières dans la feuille Bulletin (col B = moyenne, C = S1, D = S2, E = S3)
-BULLETIN_MATIERE_ROWS = list(range(9, 21))  # lignes 9 à 20
+BULLETIN_MATIERE_ROWS = list(range(9, 22))  # lignes 9 à 21
 BULLETIN_COL = {"S1": 3, "S2": 4, "S3": 5}  # C=3, D=4, E=5
 BULLETIN_AVG_COL = 2  # col B
 
@@ -325,17 +325,18 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
                     notes[i] if notes[i] is not None else None)
 
     # ── Feuille etudiant : moyenne de classe (row 7, lue depuis le fichier notes) ──
-    if semestre_cible in ("S2", "S3"):
-        avg_notes = data["avgs"].get(semestre_cible)
-        if avg_notes is None:
-            for s in reversed(sems_actifs):
-                if s in data["avgs"]:
-                    avg_notes = data["avgs"][s]
-                    break
-        if avg_notes:
-            for i, col in enumerate(cols):
-                if i < len(avg_notes) and avg_notes[i] is not None:
-                    ws_et.cell(row=7, column=col).value = avg_notes[i]
+    # Copiée pour tous les semestres (S1, S2, S3)
+    avg_notes = data["avgs"].get(semestre_cible)
+    if avg_notes is None:
+        # fallback : semestre actif le plus récent disponible
+        for s in reversed(sems_actifs):
+            if s in data["avgs"]:
+                avg_notes = data["avgs"][s]
+                break
+    if avg_notes:
+        for i, col in enumerate(cols):
+            if i < len(avg_notes) and avg_notes[i] is not None:
+                ws_et.cell(row=7, column=col).value = avg_notes[i]
 
     # ── Feuille Bulletin : date d'émission en C6 ──
     ws_bul["C6"].value = date.today().strftime("%d-%m-%Y")
@@ -346,7 +347,7 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
     nb_sems = len(sems_actifs)
     for row_idx in BULLETIN_MATIERE_ROWS:
         if semestre_cible == "S1":
-            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = 0
+            ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None  # vide pour S1
         else:
             total = 0.0
             for sem in sems_actifs:
