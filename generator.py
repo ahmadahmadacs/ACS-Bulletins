@@ -127,8 +127,7 @@ def load_group_semester(file_path, group, sem):
     result      = {}
     pending     = []
     header_done = False
-
-    current_class = ""
+    current_class_fichier = ""  # nom de classe pour le fichier PDF (col B de معدل الصف)
 
     for row in ws.iter_rows(values_only=True):
         if not row or row[0] is None:
@@ -155,20 +154,21 @@ def load_group_semester(file_path, group, sem):
 
             # Lire le nom de classe en colonne B si c'est معدل الصف
             if "الصف" in val0:
-                class_name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-                if class_name:
-                    current_class = class_name
+                cn = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                if cn:
+                    current_class_fichier = cn
                     for nom in pending:
-                        result[nom]["classe"] = current_class
+                        result[nom]["classe_fichier"] = current_class_fichier
 
             for nom in pending:
                 result[nom]["class_avg"] = avg
             pending = []
             continue
 
-        nom   = row[0]
-        notes = [row[2 + i] if (2 + i) < len(row) else None for i in range(nb_cols)]
-        result[nom] = {"classe": current_class, "notes": notes, "class_avg": None}
+        nom    = row[0]
+        classe = row[1] if len(row) > 1 else ""  # valeur originale pour le bulletin
+        notes  = [row[2 + i] if (2 + i) < len(row) else None for i in range(nb_cols)]
+        result[nom] = {"classe": classe, "classe_fichier": current_class_fichier, "notes": notes, "class_avg": None}
         pending.append(nom)
 
     wb.close()
@@ -183,7 +183,14 @@ def build_students(notes_path, group):
             data = load_group_semester(notes_path, group, sem)
             for nom, info in data.items():
                 if nom not in students:
-                    students[nom] = {"classe": info["classe"], "sems": {}, "avgs": {}}
+                    students[nom] = {
+                        "classe":         info["classe"],
+                        "classe_fichier": info.get("classe_fichier", ""),
+                        "sems": {}, "avgs": {}
+                    }
+                # Mettre à jour classe_fichier si on en trouve un non-vide
+                if info.get("classe_fichier"):
+                    students[nom]["classe_fichier"] = info["classe_fichier"]
                 students[nom]["sems"][sem] = info["notes"]
                 if info["class_avg"] is not None:
                     students[nom]["avgs"][sem] = info["class_avg"]
@@ -355,7 +362,7 @@ def generate_all(notes_path, templates: dict, output_dir: Path,
 
     for idx, (group, nom, data, tmpl_path) in enumerate(all_students):
         safe_nom    = nom.replace(" ", "_")
-        safe_classe = str(data.get("classe", "")).replace(" ", "_").replace("/", "-")
+        safe_classe = str(data.get("classe_fichier", "")).replace(" ", "_").replace("/", "-")
         prefix      = safe_classe if safe_classe else group
         xlsx = tmp_dir    / f"{prefix}_{safe_nom}.xlsx"
         pdf  = output_dir / f"{prefix}_{safe_nom}.pdf"
