@@ -99,7 +99,7 @@ def copy_color(color_obj):
         return BLACK_COLOR
     return copy.copy(color_obj)
 
-def is_white_cell(row_idx, col_idx):
+def is_white_cell(row_idx, col_idx, group=""):
     # G5, G6 retirés (v8) — pas de fond propre → texte NOIR
     WHITE_CELLS = {
         (5, 5), (6, 5),    # E5, E6
@@ -107,9 +107,15 @@ def is_white_cell(row_idx, col_idx):
         (14, 8),           # H14
         (19, 8),           # H19
     }
-    for r in (20, 21, 22):
-        for c in range(1, 9):
-            WHITE_CELLS.add((r, c))
+    # EB3-6 : lignes 20 et 21 sont visibles (matière + somme), seule la 22 est blanche
+    if group == "EB3-6":
+        for r in (22,):
+            for c in range(1, 9):
+                WHITE_CELLS.add((r, c))
+    else:
+        for r in (20, 21, 22):
+            for c in range(1, 9):
+                WHITE_CELLS.add((r, c))
     return (row_idx, col_idx) in WHITE_CELLS
 
 # ─────────────────────────────────────────────
@@ -215,7 +221,7 @@ def build_students(notes_path, group):
 # ─────────────────────────────────────────────
 # FIX FORMATTING
 # ─────────────────────────────────────────────
-def fix_bulletin_formatting(wb):
+def fix_bulletin_formatting(wb, group=""):
     ws = wb["Bulletin"]
 
     for row in ws.iter_rows():
@@ -223,7 +229,7 @@ def fix_bulletin_formatting(wb):
             if cell.value is None:
                 continue
             old_font = cell.font
-            color = WHITE_COLOR if is_white_cell(cell.row, cell.column) \
+            color = WHITE_COLOR if is_white_cell(cell.row, cell.column, group) \
                     else copy_color(old_font.color)
             cell.font = Font(name="Calibri", size=12,
                              bold=old_font.bold, color=color)
@@ -341,12 +347,15 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
     # ── Feuille Bulletin : date d'émission en C6 ──
     ws_bul["C6"].value = date.today().strftime("%d-%m-%Y")
 
-    # ── Feuille Bulletin : moyenne par matière en col B (lignes 9-19) ──
+    # ── Feuille Bulletin : moyenne par matière en col B ──
     # Calculée depuis etudiant (colonnes C/D/E = S1/S2/S3)
     # S1 → vide, S2 → (C+D)/2, S3 → (C+D+E)/3  — note vide = 0
+    # EB3-6 : 12 matières lignes 9-20 → somme en B21
+    # Autres groupes : 11 matières lignes 9-19 → somme en B20
     nb_sems = len(sems_actifs)
-    MATIERE_ROWS_NORMAL = list(range(9, 20))  # lignes 9 à 19 (depuis etudiant)
-    b_values = {}  # stocke les moyennes B9:B19 pour calculer B20 ensuite
+    last_matiere_row = 20 if group == "EB3-6" else 19
+    MATIERE_ROWS_NORMAL = list(range(9, last_matiere_row + 1))
+    b_values = {}  # stocke les moyennes pour calculer la somme ensuite
     for row_idx in MATIERE_ROWS_NORMAL:
         if semestre_cible == "S1":
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = None
@@ -364,20 +373,22 @@ def fill_template(template_path, out_path, nom, data, group, semestre_cible="S3"
             ws_bul.cell(row=row_idx, column=BULLETIN_AVG_COL).value = moyenne
             b_values[row_idx] = moyenne
 
-    # ── Feuille Bulletin : B20 = somme de B9:B19 ──
-    # On utilise b_values déjà calculées, pas ws_bul.cell (qui peut contenir des formules)
+    # ── Feuille Bulletin : somme des moyennes matières ──
+    # EB3-6 : somme en B21 (B20 est une matière normale)
+    # Autres groupes : somme en B20
+    avg_sum_row = 21 if group == "EB3-6" else 20
     if semestre_cible == "S1":
-        ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = None
+        ws_bul.cell(row=avg_sum_row, column=BULLETIN_AVG_COL).value = None
     else:
-        total_b20 = sum(b_values.values())
-        ws_bul.cell(row=20, column=BULLETIN_AVG_COL).value = round(total_b20, 2)
+        total_sum = sum(b_values.values())
+        ws_bul.cell(row=avg_sum_row, column=BULLETIN_AVG_COL).value = round(total_sum, 2)
 
-    # B21 : laissé tel quel (formule du template)
+    # B22 (EB3-6) / B21 (autres) : laissé tel quel (formule du template)
 
     # ── Étendre la zone d'impression jusqu'à la ligne 44 ──
     ws_bul.print_area = "A1:H44"
 
-    fix_bulletin_formatting(wb)
+    fix_bulletin_formatting(wb, group=group)
     fix_etudiant_formatting(wb)
     wb.save(out_path)
     wb.close()
