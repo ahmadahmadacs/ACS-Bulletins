@@ -9,6 +9,20 @@ import tempfile
 import subprocess
 from pathlib import Path
 
+# ─────────────────────────────────────────────
+# FONT SETUP — refresh cache pour LibreOffice
+# ─────────────────────────────────────────────
+def setup_fonts():
+    """Force le refresh du cache polices pour que LibreOffice utilise
+    les polices Microsoft installées via packages.txt (ttf-mscorefonts-installer)."""
+    try:
+        subprocess.run(["fc-cache", "-f", "-v"],
+                       capture_output=True, timeout=30)
+    except Exception:
+        pass
+
+setup_fonts()
+
 import streamlit as st
 from generator import (
     ensure_libreoffice, ensure_calibri,
