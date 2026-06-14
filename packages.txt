@@ -1,3 +1,2 @@
-libreoffice
-fonts-crosextra-carlito
+ttf-mscorefonts-installer
 fontconfig
