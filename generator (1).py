@@ -194,7 +194,7 @@ def fix_bulletin_formatting(wb):
             old_font = cell.font
             color = WHITE_COLOR if is_white_cell(cell.row, cell.column) \
                     else copy_color(old_font.color)
-            cell.font = Font(name="Calibri", size=12,
+            cell.font = Font(name="Palatino Linotype", size=12,
                              bold=old_font.bold, color=color)
 
     # Col G rows 9-21 : labels matières
@@ -204,7 +204,7 @@ def fix_bulletin_formatting(wb):
             old_a   = cell.alignment
             fsize   = 9 if len(str(cell.value)) > 12 else 11
             color   = WHITE_COLOR if row_idx >= 20 else copy_color(cell.font.color)
-            cell.font = Font(name="Calibri", size=fsize,
+            cell.font = Font(name="Palatino Linotype", size=fsize,
                              bold=cell.font.bold, color=color)
             cell.alignment = Alignment(
                 horizontal=old_a.horizontal, vertical="center",
@@ -214,7 +214,7 @@ def fix_bulletin_formatting(wb):
     for row_idx in (5, 6):
         cell = ws.cell(row=row_idx, column=7)
         if cell.value is not None:
-            cell.font = Font(name="Calibri", size=12,
+            cell.font = Font(name="Palatino Linotype", size=12,
                              bold=cell.font.bold, color=WHITE_COLOR)
             cell.alignment = Alignment(
                 horizontal="center", vertical="center", shrink_to_fit=True)
@@ -223,7 +223,7 @@ def fix_bulletin_formatting(wb):
     for addr in ("E5", "E6"):
         cell = ws[addr]
         if cell.value is not None:
-            cell.font = Font(name="Calibri", size=12,
+            cell.font = Font(name="Palatino Linotype", size=12,
                              bold=True, color=WHITE_COLOR)
             cell.alignment = Alignment(
                 horizontal="right", vertical="center",
@@ -233,7 +233,7 @@ def fix_bulletin_formatting(wb):
     for col_idx in range(1, 6):
         cell = ws.cell(row=8, column=col_idx)
         if cell.value is not None:
-            cell.font = Font(name="Calibri", size=12,
+            cell.font = Font(name="Palatino Linotype", size=12,
                              bold=True, color=copy_color(cell.font.color))
             cell.alignment = Alignment(
                 horizontal="center", vertical="center",
@@ -242,15 +242,15 @@ def fix_bulletin_formatting(wb):
 
 def fix_etudiant_formatting(wb):
     ws = wb["etudiant"]
-    ws["B5"].font      = Font(name="Calibri", size=12, bold=True)
+    ws["B5"].font      = Font(name="Palatino Linotype", size=12, bold=True)
     ws["B5"].alignment = Alignment(horizontal="right", vertical="center")
-    ws["B4"].font      = Font(name="Calibri", size=12, bold=False)
+    ws["B4"].font      = Font(name="Palatino Linotype", size=12, bold=False)
     ws["B4"].alignment = Alignment(horizontal="right", vertical="center")
     for row_idx in range(7, 11):
         for col_idx in range(3, 16):
             cell = ws.cell(row=row_idx, column=col_idx)
             if cell.value is not None:
-                cell.font      = Font(name="Calibri", size=12)
+                cell.font      = Font(name="Palatino Linotype", size=12)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
 # ─────────────────────────────────────────────
