@@ -123,7 +123,7 @@ st.markdown("""
 st.markdown("""
 <div class="acs-header">
   <div>
-    <h1>🎓 ACS — Générateur de Bulletins</h1>
+    <h1>🎓 ACS — Générateur de Bulletins Dr Ahmad Ahmad</h1>
     <p>Akroum College of Sciences &nbsp;·&nbsp; مدرسة أكروم للعلوم &nbsp;·&nbsp; Année scolaire 2025-2026</p>
   </div>
 </div>
