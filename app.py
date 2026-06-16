@@ -89,7 +89,7 @@ st.markdown("""
   .log-box {
     background: #0D1117;
     color: #C9D1D9;
-    font-family: monospace;
+    font-family: Palatino Linotype;
     font-size: 0.82rem;
     padding: 16px;
     border-radius: 10px;
