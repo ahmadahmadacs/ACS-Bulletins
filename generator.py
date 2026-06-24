@@ -1,4 +1,4 @@
-
+ 
 """
 ACS — Core bulletin generator (v7)
 Used by both the Streamlit app and CLI.
@@ -232,7 +232,7 @@ def fix_bulletin_formatting(wb, group=""):
             old_font = cell.font
             color = WHITE_COLOR if is_white_cell(cell.row, cell.column, group) \
                     else copy_color(old_font.color)
-            cell.font = Font(name="Palatino Linotype", size=12,
+            cell.font = Font(name="Calibri", size=12,
                              bold=old_font.bold, color=color)
  
     # Col G rows 9-21 : labels matières
@@ -242,7 +242,7 @@ def fix_bulletin_formatting(wb, group=""):
             old_a   = cell.alignment
             fsize   = 9 if len(str(cell.value)) > 12 else 11
             color   = WHITE_COLOR if row_idx >= 20 else copy_color(cell.font.color)
-            cell.font = Font(name="Palatino Linotype", size=fsize,
+            cell.font = Font(name="Calibri", size=fsize,
                              bold=cell.font.bold, color=color)
             cell.alignment = Alignment(
                 horizontal=old_a.horizontal, vertical="center",
@@ -252,7 +252,7 @@ def fix_bulletin_formatting(wb, group=""):
     for row_idx in (5, 6):
         cell = ws.cell(row=row_idx, column=7)
         if cell.value is not None:
-            cell.font = Font(name="Palatino Linotype", size=12,
+            cell.font = Font(name="Calibri", size=12,
                              bold=cell.font.bold, color=BLACK_COLOR)
             cell.alignment = Alignment(
                 horizontal="center", vertical="center", shrink_to_fit=True)
@@ -261,7 +261,7 @@ def fix_bulletin_formatting(wb, group=""):
     for addr in ("E5", "E6"):
         cell = ws[addr]
         if cell.value is not None:
-            cell.font = Font(name="Palatino Linotype", size=12,
+            cell.font = Font(name="Calibri", size=12,
                              bold=True, color=WHITE_COLOR)
             cell.alignment = Alignment(
                 horizontal="right", vertical="center",
@@ -271,7 +271,7 @@ def fix_bulletin_formatting(wb, group=""):
     for col_idx in range(1, 6):
         cell = ws.cell(row=8, column=col_idx)
         if cell.value is not None:
-            cell.font = Font(name="Palatino Linotype", size=12,
+            cell.font = Font(name="Calibri", size=12,
                              bold=True, color=copy_color(cell.font.color))
             cell.alignment = Alignment(
                 horizontal="center", vertical="center",
@@ -280,15 +280,15 @@ def fix_bulletin_formatting(wb, group=""):
  
 def fix_etudiant_formatting(wb):
     ws = wb["etudiant"]
-    ws["B5"].font      = Font(name="Palatino Linotype", size=12, bold=True)
+    ws["B5"].font      = Font(name="Calibri", size=12, bold=True)
     ws["B5"].alignment = Alignment(horizontal="right", vertical="center")
-    ws["B4"].font      = Font(name="Palatino Linotype", size=12, bold=False)
+    ws["B4"].font      = Font(name="Calibri", size=12, bold=False)
     ws["B4"].alignment = Alignment(horizontal="right", vertical="center")
     for row_idx in range(7, 11):
         for col_idx in range(3, 16):
             cell = ws.cell(row=row_idx, column=col_idx)
             if cell.value is not None:
-                cell.font      = Font(name="Palatino Linotype", size=12)
+                cell.font      = Font(name="Calibri", size=12)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
  
 # ─────────────────────────────────────────────
@@ -493,3 +493,98 @@ def zip_xlsx(xlsx_list: list, zip_path: Path):
             zf.write(xlsx, xlsx.name)
     return zip_path
  
+
+# ─────────────────────────────────────────────
+# FUSION PDF PAR FAMILLE
+# ─────────────────────────────────────────────
+def merge_pdfs_by_family(pdf_list: list, family_index: dict,
+                          output_dir: Path, log=print) -> tuple:
+    """
+    Fusionne les PDFs individuels en un PDF par famille (parent_id).
+
+    pdf_list     : liste de Path vers les PDFs individuels générés
+    family_index : { parent_id → [nom_notes, ...] }  (depuis family_matcher)
+    output_dir   : dossier de sortie pour les PDFs famille
+    log          : callable
+
+    Retourne (family_pdf_list, family_errors)
+        family_pdf_list : liste de Path vers les PDFs famille
+        family_errors   : liste de strings erreurs
+    """
+    try:
+        from pypdf import PdfWriter, PdfReader
+    except ImportError:
+        log("❌ pypdf non installé — pip install pypdf")
+        return [], ["pypdf manquant"]
+
+    fam_dir = output_dir / "familles"
+    fam_dir.mkdir(parents=True, exist_ok=True)
+
+    # Index : nom_notes normalisé → Path PDF
+    # Le nom du fichier PDF est de la forme  {classe}_{nom_underscored}.pdf
+    pdf_index = {}
+    for pdf_path in pdf_list:
+        stem = pdf_path.stem  # ex: "الاول_اساسي_(ف)_أحمد_علي"
+        # Reconstituer le nom : tout après le premier segment classe
+        # Le nom est la partie après le premier underscore-groupe
+        # On indexe par les mots du nom (séparés par _)
+        pdf_index[stem] = pdf_path
+
+    def find_pdf_for_student(nom_notes: str) -> Path | None:
+        """Cherche le PDF d'un élève par son nom (correspondance sur le nom dans le stem)."""
+        safe_nom = nom_notes.replace(" ", "_")
+        # Chercher un PDF dont le stem se termine par _{safe_nom}
+        for stem, path in pdf_index.items():
+            if stem.endswith("_" + safe_nom) or stem == safe_nom:
+                return path
+        # Fallback : contient le safe_nom
+        for stem, path in pdf_index.items():
+            if safe_nom in stem:
+                return path
+        return None
+
+    family_pdf_list = []
+    family_errors   = []
+    families_done   = 0
+
+    for parent_id, children_names in family_index.items():
+        # Trouver les PDFs des enfants
+        child_pdfs = []
+        for nom in children_names:
+            p = find_pdf_for_student(nom)
+            if p and p.exists():
+                child_pdfs.append(p)
+            else:
+                log(f"  ⚠ Famille {parent_id} — PDF introuvable pour {nom!r}")
+
+        if not child_pdfs:
+            family_errors.append(f"{parent_id}: aucun PDF trouvé")
+            continue
+
+        # Fusionner
+        out_pdf = fam_dir / f"{parent_id}.pdf"
+        try:
+            writer = PdfWriter()
+            for pdf_path in child_pdfs:
+                reader = PdfReader(str(pdf_path))
+                for page in reader.pages:
+                    writer.add_page(page)
+            with open(out_pdf, "wb") as f:
+                writer.write(f)
+            family_pdf_list.append(out_pdf)
+            families_done += 1
+            enfants_str = " + ".join(children_names)
+            log(f"  👨‍👩‍👧 {parent_id} ({len(child_pdfs)} enfant(s)) → {out_pdf.name}")
+        except Exception as e:
+            family_errors.append(f"{parent_id}: {e}")
+            log(f"  ❌ {parent_id} — {e}")
+
+    log(f"\n✅ {families_done} PDFs famille générés")
+    return family_pdf_list, family_errors
+
+
+def zip_family_pdfs(family_pdf_list: list, zip_path: Path) -> Path:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for pdf in family_pdf_list:
+            zf.write(pdf, pdf.name)
+    return zip_path

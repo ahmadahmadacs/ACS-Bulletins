@@ -26,7 +26,9 @@ setup_fonts()
 import streamlit as st
 from generator import (
     ensure_libreoffice, ensure_calibri,
-    generate_all, zip_pdfs, zip_xlsx, GROUPS
+    generate_all, zip_pdfs, zip_xlsx,
+    merge_pdfs_by_family, zip_family_pdfs,
+    GROUPS
 )
 
 # ─────────────────────────────────────────────
@@ -89,7 +91,7 @@ st.markdown("""
   .log-box {
     background: #0D1117;
     color: #C9D1D9;
-    font-family: Palatino Linotype;
+    font-family: Calibri (Corps);
     font-size: 0.82rem;
     padding: 16px;
     border-radius: 10px;
@@ -123,7 +125,7 @@ st.markdown("""
 st.markdown("""
 <div class="acs-header">
   <div>
-    <h1>🎓 ACS — Générateur de Bulletins Dr Ahmad Ahmad</h1>
+    <h1>🎓 ACS — Générateur de Bulletins</h1>
     <p>Akroum College of Sciences &nbsp;·&nbsp; مدرسة أكروم للعلوم &nbsp;·&nbsp; Année scolaire 2025-2026</p>
   </div>
 </div>
@@ -138,35 +140,40 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📖 Guide rapide")
     st.markdown("""
-**Étape 1** — Uploadez le fichier Excel des notes  
-*(doit contenir les feuilles `S1/S2/S3 Notes EB...`)*
+**Étape 1** — Uploadez le fichier notes enrichi  
+*(avec la colonne `ID_Parent` — généré par `inject_parent_ids.py`)*
 
 **Étape 2** — Uploadez les templates Excel  
 *(un par groupe : EB1-2, EB3-6, EB7, EB8, EB9)*
 
 **Étape 3** — Sélectionnez les groupes à générer
 
-**Étape 4** — Cliquez **Générer** et téléchargez le ZIP
+**Étape 4** — Cliquez **Générer**  
+→ Bulletins individuels PDF  
+→ Bulletins par famille PDF *(prêts WhatsApp)*
 """)
     st.markdown("---")
     st.markdown("### ℹ️ Groupes disponibles")
     for g, cfg in GROUPS.items():
         st.markdown(f"- **{g}** — {cfg['nb_cols']} colonnes de notes")
     st.markdown("---")
-    st.caption("v7.0 · ACS 2025-2026")
+    st.caption("v8.0 · ACS 2025-2026")
 
 # ─────────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────────
-if "logs"       not in st.session_state: st.session_state.logs = []
-if "pdf_zip"    not in st.session_state: st.session_state.pdf_zip = None
-if "xlsx_zip"   not in st.session_state: st.session_state.xlsx_zip = None
-if "pdf_count"  not in st.session_state: st.session_state.pdf_count = 0
-if "errors"     not in st.session_state: st.session_state.errors = []
-if "sys_ready"  not in st.session_state: st.session_state.sys_ready = False
-if "semestre"      not in st.session_state: st.session_state.semestre = "S3"
-if "pdf_zip_name"  not in st.session_state: st.session_state.pdf_zip_name = "bulletins_ACS_S3.zip"
-if "xlsx_zip_name" not in st.session_state: st.session_state.xlsx_zip_name = "bulletins_ACS_S3_excel.zip"
+if "logs"            not in st.session_state: st.session_state.logs = []
+if "pdf_zip"         not in st.session_state: st.session_state.pdf_zip = None
+if "xlsx_zip"        not in st.session_state: st.session_state.xlsx_zip = None
+if "pdf_count"       not in st.session_state: st.session_state.pdf_count = 0
+if "errors"          not in st.session_state: st.session_state.errors = []
+if "sys_ready"       not in st.session_state: st.session_state.sys_ready = False
+if "semestre"        not in st.session_state: st.session_state.semestre = "S3"
+if "pdf_zip_name"    not in st.session_state: st.session_state.pdf_zip_name = "bulletins_ACS_S3.zip"
+if "xlsx_zip_name"   not in st.session_state: st.session_state.xlsx_zip_name = "bulletins_ACS_S3_excel.zip"
+if "family_zip"      not in st.session_state: st.session_state.family_zip = None
+if "family_zip_name" not in st.session_state: st.session_state.family_zip_name = "bulletins_familles_S3.zip"
+if "family_count"    not in st.session_state: st.session_state.family_count = 0
 
 # ─────────────────────────────────────────────
 # STEP 1 — Système (LibreOffice + Calibri)
@@ -241,11 +248,9 @@ for i, (group, fname) in enumerate(template_names.items()):
         else:
             st.caption(f"⬆️ {fname}")
 
-st.markdown("---")
 
-# ─────────────────────────────────────────────
-# STEP 4 — Sélection des groupes
-# ─────────────────────────────────────────────
+
+
 st.markdown('<div class="step-title">🎯 Étape 3 — Groupes à générer</div>',
             unsafe_allow_html=True)
 
@@ -373,13 +378,15 @@ if generate_btn and ready:
         )
 
         sem = st.session_state.semestre
+
+        # ── PDFs individuels ──
         if pdf_list:
             zip_path = tmpdir / f"bulletins_ACS_{sem}.zip"
             zip_pdfs(pdf_list, zip_path)
             st.session_state.pdf_zip      = zip_path.read_bytes()
             st.session_state.pdf_count    = len(pdf_list)
             st.session_state.pdf_zip_name = f"bulletins_ACS_{sem}.zip"
-            log(f"\n🎉 {len(pdf_list)} bulletins générés avec succès !")
+            log(f"\n🎉 {len(pdf_list)} bulletins individuels générés !")
         else:
             log("❌ Aucun bulletin généré.")
 
@@ -388,6 +395,31 @@ if generate_btn and ready:
             zip_xlsx(xlsx_list, xlsx_zip_path)
             st.session_state.xlsx_zip      = xlsx_zip_path.read_bytes()
             st.session_state.xlsx_zip_name = f"bulletins_ACS_{sem}_excel.zip"
+
+        # ── PDFs par famille (si colonne ID_Parent présente) ──
+        if pdf_list:
+            from family_matcher import read_family_index_from_notes
+            family_index, _, has_parent_col = read_family_index_from_notes(notes_path)
+
+            if has_parent_col and family_index:
+                log("\n👨‍👩‍👧 Génération des bulletins par famille...")
+                family_pdf_list, family_errors = merge_pdfs_by_family(
+                    pdf_list=pdf_list,
+                    family_index=family_index,
+                    output_dir=output_dir,
+                    log=log,
+                )
+                error_list.extend(family_errors)
+                if family_pdf_list:
+                    fam_zip_path = tmpdir / f"bulletins_familles_{sem}.zip"
+                    zip_family_pdfs(family_pdf_list, fam_zip_path)
+                    st.session_state.family_zip      = fam_zip_path.read_bytes()
+                    st.session_state.family_count    = len(family_pdf_list)
+                    st.session_state.family_zip_name = f"bulletins_familles_{sem}.zip"
+                    log(f"📦 {len(family_pdf_list)} PDFs famille prêts !")
+            elif not has_parent_col:
+                log("ℹ️ Colonne ID_Parent absente — bulletins famille non générés.")
+                log("   → Lancez inject_parent_ids.py une fois pour enrichir votre fichier notes.")
 
         st.session_state.errors = error_list
         st.session_state.logs   = logs
@@ -428,6 +460,29 @@ if st.session_state.pdf_zip:
         size_kb = len(st.session_state.pdf_zip) // 1024
         st.metric("Bulletins générés", st.session_state.pdf_count)
         st.caption(f"Taille du ZIP : {size_kb} Ko")
+
+    # ── Téléchargement PDFs famille ──
+    if st.session_state.family_zip:
+        st.markdown("---")
+        col_fam1, col_fam2 = st.columns([3, 1])
+        with col_fam1:
+            st.download_button(
+                label=f"👨‍👩‍👧  Télécharger les {st.session_state.family_count} bulletins par famille (PDF fusionnés · prêts pour WhatsApp)",
+                data=st.session_state.family_zip,
+                file_name=st.session_state.family_zip_name,
+                mime="application/zip",
+                use_container_width=True,
+            )
+        with col_fam2:
+            fam_size_kb = len(st.session_state.family_zip) // 1024
+            st.metric("Familles", st.session_state.family_count)
+            st.caption(f"Taille : {fam_size_kb} Ko")
+
+        if st.session_state.unmatched:
+            with st.expander(f"⚠️ {len(st.session_state.unmatched)} élève(s) non identifié(s) dans Schoolify", expanded=False):
+                st.markdown("Ces élèves ont un bulletin individuel mais **n'ont pas été inclus** dans un PDF famille :")
+                for u in st.session_state.unmatched:
+                    st.markdown(f"- `{u['schoolify_name']}` ({u['grade']})")
 
 if st.session_state.errors:
     with st.expander(f"⚠️ {len(st.session_state.errors)} erreur(s) à vérifier", expanded=False):
