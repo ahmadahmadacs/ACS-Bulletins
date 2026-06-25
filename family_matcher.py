@@ -284,8 +284,33 @@ def match_families(notes_path, schoolify_path) -> tuple:
 
 
 # ─────────────────────────────────────────────
-# LECTURE DIRECTE DEPUIS FICHIER NOTES ENRICHI
+# NOM DU PARENT DEPUIS SCHOOLIFY (feuille Parents)
 # ─────────────────────────────────────────────
+def build_family_names_from_schoolify(schoolify_path) -> dict:
+    """
+    Lit la feuille 'Parents' de Schoolify.
+    Retourne { parent_id → nom_parent }
+    Ex: { 'KF-0001' → 'احمد احمد احمد' }
+    """
+    wb = load_workbook(schoolify_path, read_only=True, data_only=True)
+    family_names = {}
+
+    if 'Parents' not in wb.sheetnames:
+        wb.close()
+        return family_names
+
+    ws = wb['Parents']
+    for i, row in enumerate(ws.iter_rows(values_only=True)):
+        if i == 0:
+            continue  # header
+        nom_parent = row[2]   # colonne 'Parents'
+        parent_id  = row[3]   # colonne 'Parent ID'
+        if nom_parent and parent_id:
+            family_names[str(parent_id).strip()] = str(nom_parent).strip()
+
+    wb.close()
+    return family_names
+
 def read_family_index_from_notes(notes_path) -> tuple:
     """
     Lit les ID_Parent directement depuis le fichier notes enrichi.

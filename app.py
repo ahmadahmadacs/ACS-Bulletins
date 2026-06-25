@@ -403,11 +403,14 @@ if generate_btn and ready:
 
             if has_parent_col and family_index:
                 log("\n👨‍👩‍👧 Génération des bulletins par famille...")
+                from family_matcher import read_family_index_from_notes, build_family_names_from_schoolify
+                family_names = build_family_names_from_schoolify(notes_path)
                 family_pdf_list, family_errors = merge_pdfs_by_family(
                     pdf_list=pdf_list,
                     family_index=family_index,
                     output_dir=output_dir,
                     log=log,
+                    family_names=family_names,
                 )
                 error_list.extend(family_errors)
                 if family_pdf_list:

@@ -498,7 +498,8 @@ def zip_xlsx(xlsx_list: list, zip_path: Path):
 # FUSION PDF PAR FAMILLE
 # ─────────────────────────────────────────────
 def merge_pdfs_by_family(pdf_list: list, family_index: dict,
-                          output_dir: Path, log=print) -> tuple:
+                          output_dir: Path, log=print,
+                          family_names: dict = None) -> tuple:
     """
     Fusionne les PDFs individuels en un PDF par famille (parent_id).
 
@@ -506,6 +507,7 @@ def merge_pdfs_by_family(pdf_list: list, family_index: dict,
     family_index : { parent_id → [nom_notes, ...] }  (depuis family_matcher)
     output_dir   : dossier de sortie pour les PDFs famille
     log          : callable
+    family_names : { parent_id → nom_famille }  (optionnel, pour nommer les fichiers)
 
     Retourne (family_pdf_list, family_errors)
         family_pdf_list : liste de Path vers les PDFs famille
@@ -562,7 +564,13 @@ def merge_pdfs_by_family(pdf_list: list, family_index: dict,
             continue
 
         # Fusionner
-        out_pdf = fam_dir / f"{parent_id}.pdf"
+        # Nom du fichier : ID_Parent_NomFamille.pdf
+        nom_famille = (family_names or {}).get(parent_id, '')
+        if nom_famille:
+            safe_nom = nom_famille.replace(' ', '_').replace('/', '_')
+            out_pdf = fam_dir / f"{parent_id}_{safe_nom}.pdf"
+        else:
+            out_pdf = fam_dir / f"{parent_id}.pdf"
         try:
             writer = PdfWriter()
             for pdf_path in child_pdfs:
