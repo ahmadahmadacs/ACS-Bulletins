@@ -478,11 +478,7 @@ if st.session_state.pdf_zip:
             st.metric("Familles", st.session_state.family_count)
             st.caption(f"Taille : {fam_size_kb} Ko")
 
-        if st.session_state.unmatched:
-            with st.expander(f"⚠️ {len(st.session_state.unmatched)} élève(s) non identifié(s) dans Schoolify", expanded=False):
-                st.markdown("Ces élèves ont un bulletin individuel mais **n'ont pas été inclus** dans un PDF famille :")
-                for u in st.session_state.unmatched:
-                    st.markdown(f"- `{u['schoolify_name']}` ({u['grade']})")
+
 
 if st.session_state.errors:
     with st.expander(f"⚠️ {len(st.session_state.errors)} erreur(s) à vérifier", expanded=False):
