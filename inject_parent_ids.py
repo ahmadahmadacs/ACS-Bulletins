@@ -162,21 +162,43 @@ def build_parent_mapping(schoolify_path: Path, notes_names: set) -> dict:
 
         return None
 
-    mapping = {}
+    # Détecter les doublons de noms dans Schoolify
+    from collections import Counter
+    nom_count = Counter(sc['name'] for sc in sc_students)
+    doublons = {n for n, c in nom_count.items() if c > 1}
+    if doublons:
+        print(f"  ⚠ Noms en doublon détectés : {doublons}")
+
+    # mapping (nom_notes, classe_arabe) → parent_id  pour les doublons
+    # mapping nom_notes → parent_id  pour les cas simples
+    mapping       = {}    # nom_notes → parent_id  (cas simples)
+    mapping_exact = {}    # (nom_notes, classe_arabe) → parent_id  (doublons)
     unmatched = []
+
     for sc in sc_students:
         # Override manuel
         override_name = MANUAL_OVERRIDES.get(sc['name'])
         if override_name and override_name in notes_names:
-            mapping[override_name] = sc['parent_id']
+            if sc['name'] in doublons:
+                classes = GRADE_TO_CLASSE.get(sc['grade'], [])
+                for cl in classes:
+                    mapping_exact[(override_name, cl)] = sc['parent_id']
+            else:
+                mapping[override_name] = sc['parent_id']
             continue
+
         notes_name = find_notes_name(sc)
         if notes_name:
-            mapping[notes_name] = sc['parent_id']
+            if sc['name'] in doublons:
+                classes = GRADE_TO_CLASSE.get(sc['grade'], [])
+                for cl in classes:
+                    mapping_exact[(notes_name, cl)] = sc['parent_id']
+            else:
+                mapping[notes_name] = sc['parent_id']
         else:
             unmatched.append(sc['name'])
 
-    return mapping, unmatched
+    return mapping, mapping_exact, unmatched
 
 
 # Heuristique groupe depuis le nom (on n'a pas le groupe ici — on le déduit du contexte)
@@ -211,8 +233,8 @@ def inject_parent_ids(notes_path: Path, schoolify_path: Path, out_path: Path):
 
     # Passe 2 — construire le mapping nom → parent_id
     print(f"📂 Lecture Schoolify : {schoolify_path.name}")
-    parent_map, unmatched = build_parent_mapping(schoolify_path, all_notes_names)
-    print(f"  → {len(parent_map)} élèves matchés · {len(unmatched)} non matchés")
+    parent_map, parent_map_exact, unmatched = build_parent_mapping(schoolify_path, all_notes_names)
+    print(f"  → {len(parent_map) + len(parent_map_exact)} élèves matchés · {len(unmatched)} non matchés")
     if unmatched:
         print(f"  ⚠ Non matchés : {unmatched}")
 
@@ -268,7 +290,14 @@ def inject_parent_ids(notes_path: Path, schoolify_path: Path, out_path: Path):
             nom = nom.strip()
             if 'معدل' in nom or nom in ('Nom',):
                 continue
-            pid = parent_map.get(nom)
+
+            # Lire la classe (col B) pour résoudre les doublons
+            classe_cell = row[1] if len(row) > 1 else None
+            classe = str(classe_cell.value).strip() if classe_cell and classe_cell.value else ''
+
+            # Chercher d'abord dans l'index exact (nom+classe) pour les doublons
+            pid = parent_map_exact.get((nom, classe)) or parent_map.get(nom)
+
             if pid:
                 id_cell = ws.cell(row=nom_cell.row, column=id_col)
                 id_cell.value     = pid
@@ -283,7 +312,7 @@ def inject_parent_ids(notes_path: Path, schoolify_path: Path, out_path: Path):
     wb.close()
     print(f"\n✅ Fichier enrichi sauvegardé : {out_path.name}")
     print(f"   {injected_total} cellules ID_Parent remplies au total")
-    return parent_map, unmatched
+    return parent_map, parent_map_exact, unmatched
 
 
 # ── CLI ───────────────────────────────────────────────────────────────
