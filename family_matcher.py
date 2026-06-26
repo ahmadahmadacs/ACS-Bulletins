@@ -314,59 +314,89 @@ def build_family_names_from_schoolify(schoolify_path) -> dict:
 def read_family_index_from_notes(notes_path) -> tuple:
     """
     Lit les ID_Parent directement depuis le fichier notes enrichi.
-    Utilise la colonne 'ID_Parent' ajoutée par inject_parent_ids.py.
+    Utilise UNIQUEMENT les feuilles S1 pour éviter de traiter chaque
+    élève 3 fois (S1/S2/S3) et d'avoir des doublons dans le family_index.
+    Gère les homonymes via la clé (nom, classe).
 
     Retourne :
         family_index   : { parent_id → [nom_notes, ...] }
         notes_students : { nom_notes → { groupe, classe } }
-        has_parent_col : bool — True si la colonne ID_Parent est présente
+        has_parent_col : bool
     """
     wb = load_workbook(notes_path, read_only=True, data_only=True)
     notes_students = {}
     family_index   = {}
     has_parent_col = False
 
-    for sheet, groupe in SHEET_TO_GROUPE.items():
+    # Seulement S1 — un élève = une entrée
+    S1_ONLY = {
+        'S1 Notes EB1-2': 'EB1-2',
+        'S1 Notes EB3-6': 'EB3-6',
+        'S1 Notes EB7':   'EB7',
+        'S1 Notes EB8':   'EB8',
+        'S1 Notes EB9':   'EB9',
+    }
+
+    # Détecter les homonymes dans ces feuilles S1
+    all_noms = []
+    for sheet in S1_ONLY:
+        if sheet not in wb.sheetnames:
+            continue
+        ws = wb[sheet]
+        for i, row in enumerate(ws.iter_rows(values_only=True)):
+            if i < 1: continue
+            nom = row[0]
+            if nom and isinstance(nom, str) and 'معدل' not in nom and nom not in ('Nom',):
+                all_noms.append(nom.strip())
+
+    from collections import Counter
+    homonymes = {n for n, c in Counter(all_noms).items() if c > 1}
+
+    for sheet, groupe in S1_ONLY.items():
         if sheet not in wb.sheetnames:
             continue
         ws = wb[sheet]
 
-        # Trouver la colonne ID_Parent dans les 3 premières lignes
+        # Trouver la colonne ID_Parent
         id_parent_col = None
         for i, row in enumerate(ws.iter_rows(values_only=True)):
-            if i > 3:
-                break
+            if i > 3: break
             for j, v in enumerate(row):
                 if v == 'ID_Parent':
-                    id_parent_col = j  # 0-based
+                    id_parent_col = j
                     has_parent_col = True
                     break
-            if id_parent_col is not None:
-                break
+            if id_parent_col is not None: break
 
         for i, row in enumerate(ws.iter_rows(values_only=True)):
-            if i < 1:
-                continue
+            if i < 1: continue
             nom = row[0]
-            if not nom or not isinstance(nom, str):
-                continue
+            if not nom or not isinstance(nom, str): continue
             nom = nom.strip()
-            if 'معدل' in nom or nom in ('Nom',):
-                continue
+            if 'معدل' in nom or nom in ('Nom',): continue
 
-            classe = row[1] if len(row) > 1 else ''
-            notes_students[nom] = {
-                'groupe': groupe,
-                'classe': str(classe).strip() if classe else '',
-            }
+            classe = str(row[1]).strip() if len(row) > 1 and row[1] else ''
+            notes_students[nom] = {'groupe': groupe, 'classe': classe}
 
-            if id_parent_col is not None and id_parent_col < len(row):
-                pid = row[id_parent_col]
-                if pid and isinstance(pid, str):
-                    pid = pid.strip()
-                    family_index.setdefault(pid, [])
-                    if nom not in family_index[pid]:
-                        family_index[pid].append(nom)
+            if id_parent_col is None or id_parent_col >= len(row): continue
+            pid = row[id_parent_col]
+            if not pid or not isinstance(pid, str): continue
+            pid = pid.strip()
+
+            family_index.setdefault(pid, [])
+            # Pour les homonymes : utiliser (nom, classe) comme clé unique
+            # pour s'assurer que chaque élève va dans la bonne famille
+            if nom in homonymes:
+                # Vérifier qu'on n'a pas déjà ce nom+classe dans ce pid
+                already_here = any(
+                    n == nom and notes_students.get(n, {}).get('classe') == classe
+                    for n in family_index[pid]
+                )
+                if not already_here:
+                    family_index[pid].append(nom)
+            else:
+                if nom not in family_index[pid]:
+                    family_index[pid].append(nom)
 
     wb.close()
     return family_index, notes_students, has_parent_col
